@@ -28,7 +28,7 @@ io.on('connection', (socket) => {
 
         if (connectedPeer){
             const data = {
-                callerSocketId: socketId,
+                callerSocketId: socket.id,
                 callType,
             };
 
