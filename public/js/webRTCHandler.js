@@ -4,10 +4,20 @@ import * as ui from './ui.js';
 import * as store from './store.js';
 
 let connectedUserDetails = null;
+let peerConnection = null;
+
 
 const defaultConstraints = {
     audio: true,
     video: true
+}
+
+const configuration = {
+    iceServers:[
+        {
+            urls: 'stun:stun.l.google.com:13902',
+        }
+    ]
 }
 
 export const getLocalPreview = () => {
@@ -58,6 +68,7 @@ export const handlePreOffer = (data) => {
 
 const acceptCallHandler = () =>{
     console.log('Call accepted');
+    createPeerConnection();
     sendPreOfferAnswer(constants.preOfferAnswer.CALL_ACCEPTED);
     ui.showCallElements(connectedUserDetails.callType);
 };
@@ -101,8 +112,58 @@ export const handlePreOfferAnswer = (data) => {
 
     if (preOfferAnswer === constants.preOfferAnswer.CALL_ACCEPTED){
         ui.showCallElements(connectedUserDetails.callType);
-        // send webRTC offer
+        createPeerConnection();
+        sendWebRTCOffer();
     }
 
 
+}
+
+const sendWebRTCOffer = async () => {
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    wss.sendDataUsingRTCSignaling({
+        connectedUserSocketId: connectedUserDetails.socketId,
+        type: constants.webRTCSignaling.OFFER,
+        offer: offer,
+    });
+}
+
+export const handleWebRTCOffer = (data) => {
+    console.log('webRTC offer came');
+    console.log(data);
+}
+
+const createPeerConnection = () => {
+    peerConnection = new RTCPeerConnection(configuration);
+
+    peerConnection.onicecandidate = (event) => {
+        console.log('send our ice cadidates to other peer user');
+        if (event.candidate){
+            // send our ice cadidates to other peer user
+        }
+    }
+
+    peerConnection.onconnectionstatechange = (event) => {
+        if (peerConnection.connectionState === 'connected') {
+            console.log('succesfully connected with other peer');
+        }
+    }
+
+    // receiving tracks
+    const remoteStream = new MediaStream();
+    store.setRemoteStream(remoteStream);
+    ui.updateRemoteVideo(remoteStream);
+
+    peerConnection.ontrack = (event) => {
+        remoteStream.addTrack(event.track);
+    }
+
+    // add our stream to peer connection
+    if (connectedUserDetails.callType === constants.callType.VIDEO_PERSONAL_CODE) {
+        const localStream = store.getState().localStream;
+        for (const track of localStream.getTracks()){
+            peerConnection.addTrack(track, localStream);
+        }
+    }
 }
