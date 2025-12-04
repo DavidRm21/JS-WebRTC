@@ -33,15 +33,31 @@ io.on('connection', (socket) => {
             };
 
             io.to(calleePersonalCode).emit('pre-offer', data);
+        } else {
+            const data = {
+                preOfferAnswer: 'CALLEE_NOT_FOUND'
+            };
+            io.to(socket.id).emit('pre-offer-answer', data);
         }
     });
+
+    socket.on('pre-offer-answer', (data => {
+
+        const connectedPeer = conectedPeers.find(
+            (peerSocketId) => peerSocketId === data.callerSocketId
+        );
+        if(connectedPeer){
+            io.to(data.callerSocketId).emit('pre-offer-answer', data);
+        }
+
+    }));
 
     socket.on('disconnect', () => {
         console.log('User disconnected');
 
-        const newConnectedPeers = conectedPeers.filter((peerSocketId) => {
-            peerSocketId != socket.io;
-        });
+        const newConnectedPeers = conectedPeers.filter(
+            (peerSocketId) => peerSocketId !== socket.io
+        );
 
         conectedPeers = newConnectedPeers;
     });
